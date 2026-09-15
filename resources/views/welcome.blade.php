@@ -12,7 +12,7 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.jsx'])
     </head>
-    <body class="h-screen overflow-hidden bg-black font-sans text-zinc-100 antialiased">
+    <body class="min-h-screen bg-black font-sans text-zinc-100 antialiased">
         <div id="app"></div>
     </body>
 </html>
