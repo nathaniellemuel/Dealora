@@ -7,8 +7,9 @@ export function useApi(token) {
     });
 
     return {
-        listAgreements: async () => {
-            const r = await fetch('/api/agreements', { headers: headers() });
+        listAgreements: async (as = null) => {
+            const qs = as ? `?as=${encodeURIComponent(as)}` : '';
+            const r = await fetch(`/api/agreements${qs}`, { headers: headers() });
             if (!r.ok) throw new Error('Failed to load agreements');
             return r.json();
         },
@@ -49,6 +50,24 @@ export function useApi(token) {
             const r = await fetch(`/api/agreements/${id}/lock`, { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
             const j = await r.json();
             if (!r.ok) throw new Error(j.message ?? 'Lock failed');
+            return j;
+        },
+        requestCancel: async (id) => {
+            const r = await fetch(`/api/agreements/${id}/cancel-request`, { method: 'POST', headers: headers() });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.message ?? 'Cancel request failed');
+            return j;
+        },
+        approveCancel: async (id) => {
+            const r = await fetch(`/api/agreements/${id}/cancel-approve`, { method: 'POST', headers: headers() });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.message ?? 'Approve failed');
+            return j;
+        },
+        withdrawCancel: async (id) => {
+            const r = await fetch(`/api/agreements/${id}/cancel-withdraw`, { method: 'POST', headers: headers() });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.message ?? 'Withdraw failed');
             return j;
         },
         verify: async (identifier) => {

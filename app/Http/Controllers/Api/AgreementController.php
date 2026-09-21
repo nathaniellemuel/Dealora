@@ -18,9 +18,11 @@ class AgreementController extends Controller
 
         $query = Agreement::with(['activities' => fn ($q) => $q->latest()->limit(5)])->latest();
 
-        if ($user->role === 'client') {
+        $as = $request->validate(['as' => ['nullable', 'in:client,freelancer,all']])['as'] ?? $user->role ?? 'all';
+
+        if ($as === 'client') {
             $query->where('client_wallet', $wallet);
-        } elseif ($user->role === 'freelancer') {
+        } elseif ($as === 'freelancer') {
             $query->where('freelancer_wallet', $wallet);
         } else {
             $query->where(function ($q) use ($wallet) {
@@ -55,10 +57,7 @@ class AgreementController extends Controller
 
         $user = $request->user();
 
-        if ($user->role !== 'client') {
-            return response()->json(['message' => 'Only clients can create agreements.'], 403);
-        }
-
+        // Any wallet can create a deal as its client; the wallet acts as client for this agreement.
         $sow = $this->generateSowArray($data);
 
         $agreement = Agreement::create([
@@ -204,6 +203,86 @@ class AgreementController extends Controller
             'action' => 'locked',
             'description' => 'Agreement locked on BOT Chain',
             'metadata' => $data,
+        ]);
+
+        return response()->json($agreement->fresh());
+    }
+
+    public function requestCancel(Request $request, Agreement $agreement)
+    {
+        $this->authorizeView($request, $agreement);
+        $wallet = strtolower($request->user()->wallet_address);
+
+        if (in_array($agreement->status, ['completed', 'cancelled'], true)) {
+            return response()->json(['message' => 'This agreement can no longer be cancelled.'], 422);
+        }
+
+        if ($agreement->cancel_requested_by === null) {
+            $agreement->update(['cancel_requested_by' => $wallet]);
+        } elseif (strtolower($agreement->cancel_requested_by) === $wallet) {
+            return response()->json(['message' => 'Cancellation already requested. Waiting for the other party.'], 422);
+        } else {
+            // Both sides have now requested — mutual agreement reached.
+            $agreement->update(['status' => 'cancelled']);
+        }
+
+        Activity::create([
+            'agreement_id' => $agreement->id,
+            'actor_wallet' => $request->user()->wallet_address,
+            'action' => $agreement->fresh()->status === 'cancelled' ? 'cancelled' : 'cancel_requested',
+            'description' => $agreement->fresh()->status === 'cancelled'
+                ? 'Agreement cancelled by mutual agreement'
+                : 'Cancellation requested, waiting for the other party',
+        ]);
+
+        return response()->json($agreement->fresh());
+    }
+
+    public function approveCancel(Request $request, Agreement $agreement)
+    {
+        $this->authorizeView($request, $agreement);
+        $wallet = strtolower($request->user()->wallet_address);
+
+        if ($agreement->cancel_requested_by === null) {
+            return response()->json(['message' => 'No cancellation request to approve.'], 422);
+        }
+
+        if (strtolower($agreement->cancel_requested_by) === $wallet) {
+            return response()->json(['message' => 'You cannot approve your own request.'], 403);
+        }
+
+        if (in_array($agreement->status, ['completed', 'cancelled'], true)) {
+            return response()->json(['message' => 'This agreement can no longer be cancelled.'], 422);
+        }
+
+        $agreement->update(['status' => 'cancelled']);
+
+        Activity::create([
+            'agreement_id' => $agreement->id,
+            'actor_wallet' => $request->user()->wallet_address,
+            'action' => 'cancelled',
+            'description' => 'Agreement cancelled by mutual agreement',
+        ]);
+
+        return response()->json($agreement->fresh());
+    }
+
+    public function withdrawCancel(Request $request, Agreement $agreement)
+    {
+        $this->authorizeView($request, $agreement);
+        $wallet = strtolower($request->user()->wallet_address);
+
+        if ($agreement->cancel_requested_by === null || strtolower($agreement->cancel_requested_by) !== $wallet) {
+            return response()->json(['message' => 'No cancellation request from you to withdraw.'], 422);
+        }
+
+        $agreement->update(['cancel_requested_by' => null]);
+
+        Activity::create([
+            'agreement_id' => $agreement->id,
+            'actor_wallet' => $request->user()->wallet_address,
+            'action' => 'cancel_withdrawn',
+            'description' => 'Cancellation request withdrawn',
         ]);
 
         return response()->json($agreement->fresh());

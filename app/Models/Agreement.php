@@ -34,6 +34,7 @@ class Agreement extends Model
         'funded_amount',
         'escrow_status',
         'escrow_tx_hash',
+        'cancel_requested_by',
     ];
 
     protected function casts(): array

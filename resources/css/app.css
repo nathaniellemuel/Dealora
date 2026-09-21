@@ -2,6 +2,127 @@
 
 @plugin 'daisyui';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+html {
+    scroll-behavior: smooth;
+}
+
+section[id] {
+    scroll-margin-top: 4.5rem;
+}
+
+@keyframes dealora-marquee {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+@keyframes dealora-float {
+    0%,
+    100% {
+        transform: translateY(0) rotate(var(--float-rotate, 0deg));
+    }
+    50% {
+        transform: translateY(-12px) rotate(var(--float-rotate, 0deg));
+    }
+}
+
+@keyframes dealora-pop-in {
+    from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dealora-drop-down {
+    from {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes dealora-drop-up {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+}
+
+.animate-marquee {
+    animation: dealora-marquee 22s linear infinite;
+}
+
+.animate-float {
+    animation: dealora-float 5s ease-in-out infinite;
+}
+
+.animate-pop-in {
+    animation: dealora-pop-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-drop-down {
+    animation: dealora-drop-down 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+    transform-origin: top;
+}
+
+.animate-drop-up {
+    animation: dealora-drop-up 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
+    transform-origin: top;
+}
+
+.dark body {
+    background-color: #09090b;
+    color-scheme: dark;
+}
+
+.reveal {
+    opacity: 0;
+    transform: translateY(28px) scale(0.98);
+    transition:
+        opacity 0.7s ease,
+        transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+}
+
+.reveal-visible {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    .animate-marquee,
+    .animate-float,
+    .animate-pop-in,
+    .animate-drop-down,
+    .animate-drop-up {
+        animation: none;
+    }
+    .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../views/**/*.blade.php';
