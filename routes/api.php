@@ -22,6 +22,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/agreements/{agreement}', [AgreementController::class, 'update']);
     Route::delete('/agreements/{agreement}', [AgreementController::class, 'destroy']);
     Route::post('/agreements/{agreement}/lock', [AgreementController::class, 'lock']);
+    Route::post('/agreements/{agreement}/cancel-request', [AgreementController::class, 'requestCancel']);
+    Route::post('/agreements/{agreement}/cancel-approve', [AgreementController::class, 'approveCancel']);
+    Route::post('/agreements/{agreement}/cancel-withdraw', [AgreementController::class, 'withdrawCancel']);
 
     Route::get('/agreements/{agreement}/milestones', [MilestoneController::class, 'index']);
     Route::post('/agreements/{agreement}/milestones', [MilestoneController::class, 'store']);

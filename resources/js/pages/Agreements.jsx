@@ -6,15 +6,16 @@ import { useApi } from '../hooks/useApi';
 
 function StatusBadge({ status }) {
     const map = {
-        draft: 'bg-zinc-800 text-zinc-300',
-        pending: 'bg-amber-400/10 text-amber-300 border-amber-400/30',
-        locked: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30',
-        accepted: 'bg-emerald-400/10 text-emerald-300',
-        rejected: 'bg-red-400/10 text-red-300',
-        changes_requested: 'bg-amber-400/10 text-amber-300',
-        completed: 'bg-white text-zinc-900',
+        draft: 'bg-black text-white dark:bg-white dark:text-zinc-950',
+        pending: 'bg-[#F2842F] text-black',
+        locked: 'bg-emerald-400 text-black',
+        accepted: 'bg-emerald-400 text-black',
+        rejected: 'bg-red-400 text-black',
+        changes_requested: 'bg-[#F2842F] text-black',
+        completed: 'bg-black text-white dark:bg-white dark:text-zinc-950',
+        cancelled: 'bg-red-400 text-black',
     };
-    return <span className={`inline-flex rounded-full border px-3 py-1 text-xs ${map[status] ?? 'bg-zinc-800 text-zinc-300'}`}>{status}</span>;
+    return <span className={`inline-flex rounded-lg border-2 border-black px-3 py-1 text-xs font-black uppercase ${map[status] ?? 'bg-black text-white dark:bg-white dark:text-zinc-950'}`}>{status}</span>;
 }
 
 export default function Agreements() {
@@ -31,40 +32,47 @@ export default function Agreements() {
     }, []);
 
     return (
-        <div>
-            <div className="flex h-16 items-center justify-between border-b border-zinc-800 bg-zinc-900/50 px-4 sm:px-6">
-                <h1 className="text-xl font-semibold tracking-tight text-white">Agreements</h1>
-                <Link to="/app/create" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-zinc-200">
-                    <PlusIcon className="size-4" />
+        <div className="min-h-full bg-[#FFF6E9] font-sans text-black antialiased transition-colors dark:bg-zinc-950 dark:text-zinc-100">
+            <div className="flex h-16 items-center justify-between border-b-2 border-black bg-white px-4 sm:px-6 dark:bg-zinc-900">
+                <h1 className="text-xl font-black uppercase tracking-tight">Agreements</h1>
+                <Link
+                    to="/app/create"
+                    className="inline-flex items-center gap-2 rounded-xl border-2 border-black bg-[#F2842F] px-4 py-1.5 text-sm font-black uppercase text-black shadow-[3px_3px_0_#000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
+                >
+                    <PlusIcon className="size-4" strokeWidth={3} />
                     New agreement
                 </Link>
             </div>
 
             <div className="max-w-5xl px-4 py-8 sm:px-6">
-                <p className="font-mono text-xs text-zinc-500">{agreements.length} total</p>
+                <p className="font-mono text-xs font-bold opacity-60">{agreements.length} total</p>
 
             {loading ? (
-                <p className="mt-6 text-sm text-zinc-500">Loading…</p>
+                <p className="mt-6 text-sm font-bold uppercase opacity-50">Loading…</p>
             ) : agreements.length === 0 ? (
-                <div className="mt-6 rounded-2xl border border-dashed border-zinc-800 p-8 text-center">
-                    <p className="text-sm text-zinc-400">No agreements yet.</p>
-                    <p className="mt-2 text-xs text-zinc-500">
-                        {user?.role === 'client' ? 'Create one from the button above.' : 'Agreements assigned to you will appear here.'}
+                <div className="mt-6 rounded-2xl border-2 border-dashed border-black/40 bg-white p-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
+                    <p className="text-sm font-black">No agreements yet.</p>
+                    <p className="mt-2 text-xs font-bold opacity-60">
+                        {user?.role === 'freelancer' ? 'Agreements assigned to you will appear here.' : 'Create one from the button above.'}
                     </p>
                 </div>
                 ) : (
                     <div className="mt-6 space-y-3">
                         {agreements.map((a) => (
-                            <Link key={a.id} to={`/app/agreements/${a.id}`} className="block rounded-2xl border border-zinc-800 bg-zinc-900 p-5 hover:border-zinc-700">
+                            <Link
+                                key={a.id}
+                                to={`/app/agreements/${a.id}`}
+                                className="block rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0_#000] transition-all hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#000] dark:bg-zinc-900"
+                            >
                                 <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <p className="font-mono text-xs text-zinc-500">{a.agreement_id}</p>
-                                        <p className="mt-1 font-semibold text-white">{a.title}</p>
-                                        <p className="mt-1 line-clamp-2 text-sm text-zinc-400">{a.description}</p>
+                                    <div className="min-w-0">
+                                        <p className="font-mono text-xs font-bold opacity-50">{a.agreement_id}</p>
+                                        <p className="mt-1 font-black">{a.title}</p>
+                                        <p className="mt-1 line-clamp-2 text-sm font-medium opacity-60">{a.description}</p>
                                     </div>
                                     <StatusBadge status={a.status} />
                                 </div>
-                                <div className="mt-4 flex flex-wrap gap-4 font-mono text-xs text-zinc-500">
+                                <div className="mt-4 flex flex-wrap gap-4 font-mono text-xs font-bold opacity-60">
                                     <span>{a.budget ? `$${a.budget}` : '—'}</span>
                                     <span>{a.deadline ?? '—'}</span>
                                     <span>{a.client_wallet.slice(0, 6)}…</span>

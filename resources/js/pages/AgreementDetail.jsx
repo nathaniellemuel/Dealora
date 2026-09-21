@@ -12,21 +12,28 @@ const DEALORA_ABI = [
     'function getAgreement(string agreementId) view returns (bytes32,address,address,uint256,uint256)',
 ];
 
+const BTN_PRIMARY = 'rounded-xl border-2 border-black bg-black px-5 py-2 text-sm font-black uppercase text-white shadow-[3px_3px_0_#B8F135] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#B8F135] disabled:opacity-50 dark:bg-white dark:text-black dark:shadow-[3px_3px_0_#000]';
+const BTN_GHOST = 'rounded-xl border-2 border-black px-5 py-2 text-sm font-black uppercase transition-all hover:bg-yellow-200/60 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:border-zinc-400';
+const BTN_DANGER = 'rounded-xl border-2 border-red-500 bg-red-100 px-5 py-2 text-sm font-black uppercase text-red-700 transition-all hover:bg-red-200 disabled:opacity-50 dark:bg-red-950/20 dark:text-red-300 dark:hover:text-red-200';
+const CARD = 'rounded-2xl border-2 border-black bg-white p-6 shadow-[5px_5px_0_#000] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[5px_5px_0_#000]';
+const INPUT = 'rounded-xl border-2 border-black bg-[#FFF6E9] px-3 py-2 text-sm font-bold text-black placeholder:font-medium placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#F2842F] dark:border-zinc-700 dark:bg-zinc-950 dark:text-white';
+
 function shortHash(h) {
     return h ? `${h.slice(0, 10)}…${h.slice(-4)}` : '—';
 }
 
 function statusClass(status) {
     const map = {
-        draft: 'bg-zinc-800 text-zinc-300 border-zinc-700',
-        pending: 'bg-amber-400/10 text-amber-300 border-amber-400/30',
-        locked: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30',
-        accepted: 'bg-emerald-400/10 text-emerald-300 border-emerald-500/30',
-        rejected: 'bg-red-400/10 text-red-300 border-red-400/30',
-        changes_requested: 'bg-amber-400/10 text-amber-300 border-amber-400/30',
-        completed: 'bg-white text-zinc-900 border-white',
+        draft: 'bg-black text-white dark:bg-white dark:text-zinc-950',
+        pending: 'bg-[#F2842F] text-black',
+        locked: 'bg-emerald-400 text-black',
+        accepted: 'bg-emerald-400 text-black',
+        rejected: 'bg-red-400 text-black',
+        changes_requested: 'bg-[#F2842F] text-black',
+        completed: 'bg-black text-white dark:bg-white dark:text-zinc-950',
+        cancelled: 'bg-red-400 text-black',
     };
-    return map[status] ?? 'bg-zinc-800 text-zinc-300 border-zinc-700';
+    return map[status] ?? 'bg-black text-white dark:bg-white dark:text-zinc-950';
 }
 
 export default function AgreementDetail() {
@@ -43,6 +50,7 @@ export default function AgreementDetail() {
     const [deleting, setDeleting] = useState(false);
     const [editing, setEditing] = useState(false);
     const [funding, setFunding] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
     const [newMilestone, setNewMilestone] = useState({ title: '', amount: '' });
     const [form, setForm] = useState(null);
     const [error, setError] = useState(null);
@@ -199,6 +207,47 @@ export default function AgreementDetail() {
         }
     };
 
+    const handleRequestCancel = async () => {
+        if (!confirm('Request cancellation? The deal ends only after the other party approves.')) return;
+        setCancelling(true);
+        setError(null);
+        try {
+            const updated = await api.requestCancel(agreement.id);
+            setAgreement(updated);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const handleApproveCancel = async () => {
+        if (!confirm('Approve cancellation? This ends the deal for both sides.')) return;
+        setCancelling(true);
+        setError(null);
+        try {
+            const updated = await api.approveCancel(agreement.id);
+            setAgreement(updated);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const handleWithdrawCancel = async () => {
+        setCancelling(true);
+        setError(null);
+        try {
+            const updated = await api.withdrawCancel(agreement.id);
+            setAgreement(updated);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setCancelling(false);
+        }
+    };
+
     const handleSave = async () => {
         setSaving(true);
         setError(null);
@@ -296,12 +345,16 @@ export default function AgreementDetail() {
         }
     };
 
-    if (loading) return <div className="min-h-screen bg-zinc-950 p-8 text-zinc-400">Loading…</div>;
-    if (error && !agreement) return <div className="min-h-screen bg-zinc-950 p-8 text-red-400">{error}</div>;
+    if (loading) return <div className="min-h-screen bg-[#FFF6E9] p-8 font-bold uppercase opacity-60 dark:bg-zinc-950 dark:text-zinc-400">Loading…</div>;
+    if (error && !agreement) return <div className="min-h-screen bg-[#FFF6E9] p-8 font-bold text-red-600 dark:bg-zinc-950 dark:text-red-400">{error}</div>;
     if (!agreement || !form) return null;
 
     const isClient = user?.wallet_address === agreement.client_wallet;
     const isFreelancer = user?.wallet_address === agreement.freelancer_wallet;
+    const myWallet = (user?.wallet_address ?? '').toLowerCase();
+    const cancelRequestedBy = (agreement.cancel_requested_by ?? '').toLowerCase() || null;
+    const iRequestedCancel = cancelRequestedBy !== null && cancelRequestedBy === myWallet;
+    const cancelCancellable = (isClient || isFreelancer) && !['completed', 'cancelled'].includes(agreement.status);
     const canLock = ['pending', 'accepted', 'draft'].includes(agreement.status) && agreement.status !== 'locked';
     const canEdit = isClient && ['draft', 'changes_requested', 'rejected'].includes(agreement.status);
     const canDelete = isClient && ['draft', 'pending', 'changes_requested', 'rejected'].includes(agreement.status);
@@ -315,112 +368,119 @@ export default function AgreementDetail() {
         rejected: 'Rejected',
         locked: 'Locked',
         completed: 'Completed',
+        cancelled: 'Cancelled by mutual agreement',
     };
 
     return (
-        <div className="min-h-screen bg-zinc-950 font-sans text-zinc-100">
-            <div className="flex h-16 items-center border-b border-zinc-800 bg-zinc-900/50 px-4 sm:px-6">
-                <Link to="/app/agreements" className="-ml-2 rounded-lg p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white">
-                    <ArrowLeftIcon className="size-6" />
+        <div className="min-h-screen bg-[#FFF6E9] font-sans text-black antialiased transition-colors dark:bg-zinc-950 dark:text-zinc-100">
+            <div className="flex h-16 items-center border-b-2 border-black bg-white px-4 sm:px-6 dark:bg-zinc-900">
+                <Link to="/app/agreements" className="-ml-2 rounded-lg border-2 border-transparent p-2 hover:border-black hover:bg-yellow-200/60 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:bg-zinc-900 dark:hover:text-white">
+                    <ArrowLeftIcon className="size-6" strokeWidth={2.4} />
                 </Link>
-                <span className={`ml-auto inline-flex rounded-full border px-3 py-1 font-mono text-xs ${statusClass(agreement.status)}`}>{agreement.status}</span>
+                <span className={`ml-auto inline-flex rounded-lg border-2 border-black px-3 py-1 font-mono text-xs font-black uppercase ${statusClass(agreement.status)}`}>{agreement.status}</span>
             </div>
 
             <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+                {agreement.status === 'cancelled' && (
+                    <div className="mb-6 rounded-2xl border-2 border-red-500 bg-red-100 p-4 shadow-[5px_5px_0_#000] dark:bg-red-950/40">
+                        <p className="text-sm font-black uppercase text-red-700 dark:text-red-300">Cancelled by mutual agreement</p>
+                        <p className="mt-1 text-xs font-bold text-red-700/80 dark:text-red-300/80">Both parties agreed to end this deal. The on-chain record below remains as history.</p>
+                    </div>
+                )}
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                        <p className="font-mono text-xs text-zinc-500">{agreement.agreement_id}</p>
+                        <p className="font-mono text-xs font-bold opacity-50">{agreement.agreement_id}</p>
                         {editing ? (
                             <input
                                 value={form.title}
                                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                className="mt-2 w-full max-w-xl rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-lg font-semibold text-white focus:border-white focus:outline-none"
+                                className={`${INPUT} mt-2 w-full max-w-xl text-lg font-black`}
                             />
                         ) : (
-                            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{agreement.title}</h1>
+                            <h1 className="mt-1 text-2xl font-black tracking-tight">{agreement.title}</h1>
                         )}
                         {editing ? (
                             <textarea
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                                 rows={3}
-                                className="mt-3 w-full max-w-2xl rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white focus:border-white focus:outline-none"
+                                className={`${INPUT} mt-3 w-full max-w-2xl`}
                             />
                         ) : (
-                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400">{agreement.description}</p>
+                            <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed opacity-60">{agreement.description}</p>
                         )}
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {canEdit && !editing && (
-                            <button onClick={() => setEditing(true)} className="rounded-full border border-zinc-700 px-5 py-2 text-sm text-zinc-200 hover:border-zinc-400">
+                            <button onClick={() => setEditing(true)} className={BTN_GHOST}>
                                 Edit
                             </button>
                         )}
                         {canDelete && !editing && (
-                            <button onClick={handleDelete} disabled={deleting} className="rounded-full border border-red-900/50 bg-red-950/20 px-5 py-2 text-sm text-red-300 hover:border-red-800 hover:text-red-200 disabled:opacity-50">
+                            <button onClick={handleDelete} disabled={deleting} className={BTN_DANGER}>
                                 {deleting ? 'Deleting…' : 'Delete'}
                             </button>
                         )}
                         {editing && (
                             <>
-                                <button onClick={() => setEditing(false)} className="rounded-full border border-zinc-700 px-5 py-2 text-sm text-zinc-400 hover:text-white">
+                                <button onClick={() => setEditing(false)} className={BTN_GHOST}>
                                     Cancel
                                 </button>
-                                <button onClick={handleSave} disabled={saving} className="rounded-full bg-zinc-800 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50">
+                                <button onClick={handleSave} disabled={saving} className={BTN_PRIMARY}>
                                     {saving ? 'Saving…' : 'Save'}
                                 </button>
                             </>
                         )}
                         {isFreelancer && agreement.status === 'pending' && !editing && (
                             <>
-                                <button onClick={() => handleAction('accepted')} className="rounded-full bg-white px-5 py-2 text-sm font-medium text-zinc-950">
+                                <button onClick={() => handleAction('accepted')} className={BTN_PRIMARY}>
                                     Accept
                                 </button>
-                                <button onClick={() => handleAction('changes_requested')} className="rounded-full border border-zinc-700 px-5 py-2 text-sm text-zinc-200">
+                                <button onClick={() => handleAction('changes_requested')} className={BTN_GHOST}>
                                     Request changes
                                 </button>
-                                <button onClick={() => handleAction('rejected')} className="rounded-full border border-zinc-700 px-5 py-2 text-sm text-zinc-200">
+                                <button onClick={() => handleAction('rejected')} className={BTN_GHOST}>
                                     Reject
                                 </button>
                             </>
                         )}
                         {isClient && agreement.status === 'draft' && !editing && (
-                            <button onClick={() => handleAction('pending')} className="rounded-full bg-white px-5 py-2 text-sm font-medium text-zinc-950">
+                            <button onClick={() => handleAction('pending')} className={BTN_PRIMARY}>
                                 Send to freelancer
                             </button>
                         )}
                         {isClient && agreement.status === 'changes_requested' && !editing && (
-                            <button onClick={() => handleAction('pending')} className="rounded-full bg-white px-5 py-2 text-sm font-medium text-zinc-950">
+                            <button onClick={() => handleAction('pending')} className={BTN_PRIMARY}>
                                 Resend to freelancer
                             </button>
                         )}
                         {isClient && agreement.status === 'rejected' && !editing && (
-                            <button onClick={() => handleAction('pending')} className="rounded-full bg-white px-5 py-2 text-sm font-medium text-zinc-950">
+                            <button onClick={() => handleAction('pending')} className={BTN_PRIMARY}>
                                 Resend again
                             </button>
                         )}
                     </div>
-                    {agreement.status !== 'locked' && !editing && <p className="mt-3 w-full text-xs text-zinc-500">{statusNote[agreement.status]}</p>}
+                    {agreement.status !== 'locked' && !editing && <p className="mt-3 w-full text-xs font-bold opacity-50">{statusNote[agreement.status]}</p>}
                 </div>
 
                 <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                     <div className="space-y-6">
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-                            <h2 className="font-semibold">Scope of work</h2>
+                        <div className={CARD}>
+                            <h2 className="font-black uppercase">Scope of work</h2>
                             <div className="mt-4 grid gap-3">
                                 {Object.entries(agreement.sow ?? {}).map(([k, v]) => (
-                                    <div key={k} className="rounded-xl bg-zinc-950 px-4 py-3">
-                                        <p className="font-mono text-xs tracking-wide text-zinc-500">{k.toUpperCase()}</p>
-                                        <p className="mt-1 text-sm text-zinc-200">{Array.isArray(v) ? v.join(', ') : String(v)}</p>
+                                    <div key={k} className="rounded-xl border-2 border-black bg-[#FFF6E9] px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                                        <p className="font-mono text-xs font-black tracking-wide opacity-60">{k.toUpperCase()}</p>
+                                        <p className="mt-1 text-sm font-medium">{Array.isArray(v) ? v.join(', ') : String(v)}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+                        <div className={CARD}>
                             <div className="flex items-center justify-between">
-                                <h2 className="font-semibold">Workspace</h2>
-                                {editing && <span className="text-xs text-zinc-500">Editing</span>}
+                                <h2 className="font-black uppercase">Workspace</h2>
+                                {editing && <span className="text-xs font-bold opacity-50">Editing</span>}
                             </div>
                             <div className="mt-4 grid gap-3 text-sm">
                                 {[
@@ -431,28 +491,28 @@ export default function AgreementDetail() {
                                     ['Revisions', 'revision_policy', 'text'],
                                 ].map(([label, key, type]) =>
                                     type === 'date' ? (
-                                        <div key={key} className="flex items-center justify-between gap-4 rounded-lg bg-zinc-950 px-4 py-3">
-                                            <span className="shrink-0 text-zinc-500">{label}</span>
+                                        <div key={key} className="flex items-center justify-between gap-4 rounded-xl border-2 border-black bg-[#FFF6E9] px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                                            <span className="shrink-0 font-bold opacity-60">{label}</span>
                                             {editing ? (
                                                 <div className="w-48">
                                                     <DatePicker value={form[key] ?? ''} onChange={(v) => setForm({ ...form, [key]: v })} placeholder="Pick a date" />
                                                 </div>
                                             ) : (
-                                                <span className="text-right text-white">{agreement[key] ? new Date(agreement[key]).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+                                                <span className="text-right font-bold">{agreement[key] ? new Date(agreement[key]).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
                                             )}
                                         </div>
                                     ) : (
-                                        <div key={key} className="flex items-center justify-between gap-4 rounded-lg bg-zinc-950 px-4 py-3">
-                                            <span className="shrink-0 text-zinc-500">{label}</span>
+                                        <div key={key} className="flex items-center justify-between gap-4 rounded-xl border-2 border-black bg-[#FFF6E9] px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                                            <span className="shrink-0 font-bold opacity-60">{label}</span>
                                             {editing ? (
                                                 <input
                                                     type={type}
                                                     value={form[key] ?? ''}
                                                     onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                                                    className="w-48 rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-right text-sm text-white focus:border-zinc-600 focus:outline-none"
+                                                    className="w-48 rounded-lg border-2 border-black bg-white px-2 py-1 text-right text-sm font-bold focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                                                 />
                                             ) : (
-                                                <span className="text-right text-white">
+                                                <span className="text-right font-bold">
                                                     {key === 'budget' && agreement[key] ? `$${agreement[key]}` : (agreement[key] ?? '—')}
                                                 </span>
                                             )}
@@ -461,59 +521,59 @@ export default function AgreementDetail() {
                                 )}
                             </div>
                             {editing && (
-                                <button onClick={handleSaveAndResend} disabled={saving} className="mt-4 w-full rounded-full bg-white py-2.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50">
+                                <button onClick={handleSaveAndResend} disabled={saving} className={`${BTN_PRIMARY} mt-4 w-full py-2.5`}>
                                     {saving ? 'Saving…' : 'Save and resend'}
                                 </button>
                             )}
                         </div>
 
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-                            <h2 className="font-semibold">Activity</h2>
+                        <div className={CARD}>
+                            <h2 className="font-black uppercase">Activity</h2>
                             <div className="mt-4 space-y-3">
                                 {agreement.activities?.length ? (
                                     agreement.activities.map((act) => (
                                         <div key={act.id} className="flex gap-3">
-                                            <span className="mt-2 size-1.5 shrink-0 rounded-full bg-emerald-400" />
+                                            <span className="mt-2 size-1.5 shrink-0 rounded-full bg-emerald-500" />
                                             <div>
-                                                <p className="text-sm text-white">
-                                                    {act.action} <span className="text-zinc-500">· {new Date(act.created_at).toLocaleString()}</span>
+                                                <p className="text-sm font-bold">
+                                                    {act.action} <span className="font-mono opacity-50">· {new Date(act.created_at).toLocaleString()}</span>
                                                 </p>
-                                                <p className="text-xs text-zinc-500">{act.description} · {act.actor_wallet?.slice(0, 10)}…</p>
+                                                <p className="font-mono text-xs opacity-50">{act.description} · {act.actor_wallet?.slice(0, 10)}…</p>
                                             </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-sm text-zinc-500">No activity yet.</p>
+                                    <p className="text-sm font-bold opacity-50">No activity yet.</p>
                                 )}
                             </div>
                         </div>
                     </div>
 
                     <div className="space-y-6">
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-                            <h3 className="font-semibold">On-chain</h3>
-                            <dl className="mt-4 space-y-3 font-mono text-xs">
+                        <div className={CARD}>
+                            <h3 className="font-black uppercase">On-chain</h3>
+                            <dl className="mt-4 space-y-3 font-mono text-xs font-bold">
                                 <div className="flex justify-between">
-                                    <dt className="text-zinc-500">SOW hash</dt>
-                                    <dd className="text-zinc-200">{shortHash(agreement.sow_hash)}</dd>
+                                    <dt className="opacity-50">SOW hash</dt>
+                                    <dd>{shortHash(agreement.sow_hash)}</dd>
                                 </div>
                                 <div className="flex justify-between">
-                                    <dt className="text-zinc-500">Client</dt>
-                                    <dd className="text-zinc-200">{agreement.client_wallet.slice(0, 10)}…</dd>
+                                    <dt className="opacity-50">Client</dt>
+                                    <dd>{agreement.client_wallet.slice(0, 10)}…</dd>
                                 </div>
                                 <div className="flex justify-between">
-                                    <dt className="text-zinc-500">Freelancer</dt>
-                                    <dd className="text-zinc-200">{agreement.freelancer_wallet ? agreement.freelancer_wallet.slice(0, 10) + '…' : '—'}</dd>
+                                    <dt className="opacity-50">Freelancer</dt>
+                                    <dd>{agreement.freelancer_wallet ? agreement.freelancer_wallet.slice(0, 10) + '…' : '—'}</dd>
                                 </div>
                                 <div className="flex justify-between">
-                                    <dt className="text-zinc-500">Chain</dt>
-                                    <dd className="text-zinc-200">{agreement.chain_id ?? (chainId === 968 ? '968 testnet' : chainId ? `${chainId}` : '—')}</dd>
+                                    <dt className="opacity-50">Chain</dt>
+                                    <dd>{agreement.chain_id ?? (chainId === 968 ? '968 testnet' : chainId ? `${chainId}` : '—')}</dd>
                                 </div>
                                 <div className="flex justify-between">
-                                    <dt className="text-zinc-500">Tx</dt>
-                                    <dd className="text-zinc-200">
+                                    <dt className="opacity-50">Tx</dt>
+                                    <dd>
                                         {agreement.tx_hash ? (
-                                            <a href={`${explorerBase}/tx/${agreement.tx_hash}`} target="_blank" rel="noreferrer" className="text-emerald-300 hover:text-emerald-200">
+                                            <a href={`${explorerBase}/tx/${agreement.tx_hash}`} target="_blank" rel="noreferrer" className="font-black text-emerald-600 hover:underline dark:text-emerald-300">
                                                 {shortHash(agreement.tx_hash)}
                                             </a>
                                         ) : (
@@ -527,63 +587,111 @@ export default function AgreementDetail() {
                                 <button
                                     onClick={handleLock}
                                     disabled={locking}
-                                    className="mt-6 w-full rounded-full bg-white py-3 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50"
+                                    className="mt-6 w-full rounded-xl border-2 border-black bg-[#B8F135] py-3 text-sm font-black uppercase text-black shadow-[4px_4px_0_#000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000] disabled:opacity-50"
                                 >
                                     {locking ? 'Locking…' : 'Lock on BOT Chain'}
                                 </button>
                             ) : agreement.status === 'locked' ? (
-                                <p className="mt-6 rounded-full bg-emerald-400/10 py-3 text-center text-sm font-medium text-emerald-300">Locked</p>
+                                <p className="mt-6 rounded-xl border-2 border-black bg-emerald-400 py-3 text-center text-sm font-black uppercase text-black">Locked</p>
                             ) : null}
 
-                            {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
+                            {error && <p className="mt-3 text-xs font-bold text-red-600 dark:text-red-400">{error}</p>}
                         </div>
 
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-                            <h3 className="font-semibold">Escrow</h3>
-                            <p className="mt-1 text-xs leading-relaxed text-zinc-500">Client funds are held by contract, released only when milestone is accepted.</p>
-                            <div className="mt-4 space-y-2 font-mono text-xs">
-                                <div className="flex justify-between"><span className="text-zinc-500">Budget</span><span className="text-white">${agreement.budget ?? '—'}</span></div>
-                                <div className="flex justify-between"><span className="text-zinc-500">Funded</span><span className="text-emerald-300">${agreement.funded_amount ?? 0}</span></div>
-                                <div className="flex justify-between"><span className="text-zinc-500">Status</span><span className="capitalize text-zinc-300">{agreement.escrow_status}</span></div>
-                                {agreement.escrow_tx_hash && <div className="flex justify-between"><span className="text-zinc-500">Fund tx</span><a href={`${explorerBase}/tx/${agreement.escrow_tx_hash}`} target="_blank" rel="noreferrer" className="text-emerald-300 hover:text-emerald-200">{shortHash(agreement.escrow_tx_hash)}</a></div>}
+                        <div className={CARD}>
+                            <h3 className="font-black uppercase">Escrow</h3>
+                            <p className="mt-1 text-xs font-bold leading-relaxed opacity-60">Client funds are held by contract, released only when milestone is accepted.</p>
+                            <div className="mt-4 space-y-2 font-mono text-xs font-bold">
+                                <div className="flex justify-between"><span className="opacity-50">Budget</span><span>${agreement.budget ?? '—'}</span></div>
+                                <div className="flex justify-between"><span className="opacity-50">Funded</span><span className="text-emerald-600 dark:text-emerald-300">${agreement.funded_amount ?? 0}</span></div>
+                                <div className="flex justify-between"><span className="opacity-50">Status</span><span className="capitalize">{agreement.escrow_status}</span></div>
+                                {agreement.escrow_tx_hash && <div className="flex justify-between"><span className="opacity-50">Fund tx</span><a href={`${explorerBase}/tx/${agreement.escrow_tx_hash}`} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline dark:text-emerald-300">{shortHash(agreement.escrow_tx_hash)}</a></div>}
                             </div>
                             {isClient && agreement.escrow_status === 'unfunded' && agreement.status !== 'draft' && (
                                 <>
-                                    <p className="mt-3 text-xs text-zinc-500">Click Fund will open MetaMask to pay 0.001 BOT to escrow (demo). Need BOT? https://faucet.botchain.ai/basic</p>
-                                    <button onClick={handleFund} disabled={funding} className="mt-3 w-full rounded-full bg-white py-2.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50">
+                                    <p className="mt-3 text-xs font-bold opacity-60">Click Fund will open MetaMask to pay 0.001 BOT to escrow (demo). Need BOT? https://faucet.botchain.ai/basic</p>
+                                    <button onClick={handleFund} disabled={funding} className={`${BTN_PRIMARY} mt-3 w-full py-2.5`}>
                                         {funding ? 'Waiting for MetaMask…' : `Fund to escrow`}
                                     </button>
                                 </>
                             )}
-                            {agreement.escrow_status === 'funded' && <p className="mt-3 rounded-full bg-emerald-400/10 py-2 text-center text-xs font-medium text-emerald-300">Funds in escrow — freelancer can submit</p>}
+                            {agreement.escrow_status === 'funded' && <p className="mt-3 rounded-xl border-2 border-black bg-emerald-400 py-2 text-center text-xs font-black uppercase text-black">Funds in escrow — freelancer can submit</p>}
                         </div>
 
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-                            <h3 className="font-semibold">Milestones</h3>
+                        <div className={CARD}>
+                            <h3 className="font-black uppercase">Cancellation</h3>
+                            {agreement.status === 'cancelled' ? (
+                                <p className="mt-3 text-sm font-bold opacity-60">This deal was ended by mutual agreement. No further actions are available.</p>
+                            ) : !cancelCancellable ? (
+                                <p className="mt-3 text-sm font-bold opacity-60">Only participants can request cancellation.</p>
+                            ) : cancelRequestedBy === null ? (
+                                <>
+                                    <p className="mt-3 text-sm font-medium leading-relaxed opacity-60">
+                                        Ending a deal needs both sides. Your request notifies the other party — the deal ends only after they approve.
+                                    </p>
+                                    <button
+                                        onClick={handleRequestCancel}
+                                        disabled={cancelling}
+                                        className="mt-4 w-full rounded-xl border-2 border-red-500 bg-red-100 py-2.5 text-sm font-black uppercase text-red-700 transition-all hover:bg-red-200 disabled:opacity-50 dark:bg-red-950/40 dark:text-red-300"
+                                    >
+                                        {cancelling ? 'Sending…' : 'Request cancellation'}
+                                    </button>
+                                </>
+                            ) : iRequestedCancel ? (
+                                <>
+                                    <p className="mt-3 rounded-xl border-2 border-black bg-[#F2842F] px-3 py-2 text-sm font-black text-black">
+                                        Waiting for the other party to approve your request.
+                                    </p>
+                                    <button
+                                        onClick={handleWithdrawCancel}
+                                        disabled={cancelling}
+                                        className={`${BTN_GHOST} mt-4 w-full py-2.5`}
+                                    >
+                                        {cancelling ? 'Working…' : 'Withdraw request'}
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="mt-3 rounded-xl border-2 border-red-500 bg-red-100 px-3 py-2 text-sm font-black text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                                        The other party requested cancellation of this deal.
+                                    </p>
+                                    <button
+                                        onClick={handleApproveCancel}
+                                        disabled={cancelling}
+                                        className="mt-4 w-full rounded-xl border-2 border-black bg-red-500 py-2.5 text-sm font-black uppercase text-black shadow-[3px_3px_0_#000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000] disabled:opacity-50"
+                                    >
+                                        {cancelling ? 'Working…' : 'Approve cancellation'}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        <div className={CARD}>
+                            <h3 className="font-black uppercase">Milestones</h3>
                             {milestones.length === 0 ? (
-                                <p className="mt-3 text-sm text-zinc-500">No milestones yet.</p>
+                                <p className="mt-3 text-sm font-bold opacity-50">No milestones yet.</p>
                             ) : (
                                 <div className="mt-3 space-y-3">
                                     {milestones.map((m) => (
-                                        <div key={m.id} className="rounded-xl bg-zinc-950 p-4">
+                                        <div key={m.id} className="rounded-xl border-2 border-black bg-[#FFF6E9] p-4 dark:border-zinc-800 dark:bg-zinc-950">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
-                                                    <p className="text-sm font-medium text-white">{m.title}</p>
-                                                    <p className="font-mono text-xs text-zinc-500">${m.amount} · {m.status} · {m.escrow_status}</p>
+                                                    <p className="text-sm font-black">{m.title}</p>
+                                                    <p className="font-mono text-xs font-bold opacity-50">${m.amount} · {m.status} · {m.escrow_status}</p>
                                                 </div>
-                                                <span className={`rounded-full border px-2 py-1 text-xs ${statusClass(m.status)}`}>{m.status}</span>
+                                                <span className={`shrink-0 rounded-lg border-2 border-black px-2 py-1 text-xs font-black uppercase ${statusClass(m.status)}`}>{m.status}</span>
                                             </div>
                                             <div className="mt-3 flex flex-wrap gap-2">
                                                 {isFreelancer && ['pending', 'in_progress', 'unfunded'].includes(m.status) && m.escrow_status !== 'paid' && (
-                                                    <button onClick={() => handleSubmitMilestone(m.id)} className="rounded-full bg-white px-4 py-1.5 text-xs font-medium text-zinc-950">Mark submitted</button>
+                                                    <button onClick={() => handleSubmitMilestone(m.id)} className="rounded-xl border-2 border-black bg-black px-4 py-1.5 text-xs font-black uppercase text-white dark:bg-white dark:text-black">Mark submitted</button>
                                                 )}
                                                 {isClient && m.status === 'submitted' && (
                                                     <>
-                                                        <button onClick={() => handleApproveMilestone(m.id)} className="rounded-full bg-emerald-400 px-4 py-1.5 text-xs font-semibold text-zinc-950">Accept & release ${m.amount}</button>
-                                                        <button onClick={() => handleRequestChangesMilestone(m.id)} className="rounded-full border border-zinc-700 px-4 py-1.5 text-xs text-zinc-300">Request changes</button>
+                                                        <button onClick={() => handleApproveMilestone(m.id)} className="rounded-xl border-2 border-black bg-emerald-400 px-4 py-1.5 text-xs font-black uppercase text-black">Accept & release ${m.amount}</button>
+                                                        <button onClick={() => handleRequestChangesMilestone(m.id)} className="rounded-xl border-2 border-black px-4 py-1.5 text-xs font-black uppercase dark:border-zinc-700">Request changes</button>
                                                     </>
                                                 )}
-                                                {m.escrow_status === 'paid' && <span className="text-xs text-emerald-300">Paid to freelancer</span>}
+                                                {m.escrow_status === 'paid' && <span className="text-xs font-black text-emerald-600 dark:text-emerald-300">Paid to freelancer</span>}
                                             </div>
                                         </div>
                                     ))}
@@ -591,16 +699,16 @@ export default function AgreementDetail() {
                             )}
                             {isClient && (
                                 <div className="mt-4 flex gap-2">
-                                    <input value={newMilestone.title} onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })} placeholder="Milestone title" className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none" />
-                                    <input value={newMilestone.amount} onChange={(e) => setNewMilestone({ ...newMilestone, amount: e.target.value })} placeholder="$" type="number" className="w-20 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none" />
-                                    <button onClick={handleAddMilestone} className="rounded-lg bg-zinc-800 px-4 py-2 text-sm text-white hover:bg-zinc-700">Add</button>
+                                    <input value={newMilestone.title} onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })} placeholder="Milestone title" className={`${INPUT} flex-1`} />
+                                    <input value={newMilestone.amount} onChange={(e) => setNewMilestone({ ...newMilestone, amount: e.target.value })} placeholder="$" type="number" className={`${INPUT} w-20`} />
+                                    <button onClick={handleAddMilestone} className="rounded-xl border-2 border-black bg-black px-4 py-2 text-sm font-black text-white dark:bg-white dark:text-black">Add</button>
                                 </div>
                             )}
                         </div>
 
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-                            <p className="font-mono text-xs text-zinc-500">BOT Chain</p>
-                            <p className="mt-1 text-sm text-zinc-300">Testnet 968 · Mainnet 677</p>
+                        <div className={CARD}>
+                            <p className="font-mono text-xs font-black opacity-50">BOT Chain</p>
+                            <p className="mt-1 text-sm font-bold">Testnet 968 · Mainnet 677</p>
                         </div>
                     </div>
                 </div>

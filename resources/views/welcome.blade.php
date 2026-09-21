@@ -12,7 +12,7 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.jsx'])
     </head>
-    <body class="min-h-screen bg-black font-sans text-zinc-100 antialiased">
+    <body class="min-h-screen bg-[#FFF6E9] font-sans text-black antialiased">
         <div id="app"></div>
     </body>
 </html>
